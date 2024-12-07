@@ -1,0 +1,171 @@
+version: '3.8'
+
+x-omnistrate-service-plan:
+  name: 'Clickhouse Dedicated'
+  tenancyType: 'OMNISTRATE_DEDICATED_TENANCY'
+  deployment:
+    hostedDeployment:
+      AwsAccountId: '<AWS_ACCOUNT_ID>'
+      AwsBootstrapRoleAccountArn: 'arn:aws:iam::<AWS_ACCOUNT_ID>:role/omnistrate-bootstrap-role'
+
+x-omnistrate-integrations:
+ - omnistrateLogging
+ - omnistrateMetrics
+
+services:
+  clickhouse:
+    labels:
+      - "name=Clickhouse Cluster"
+    image: "clickhouse/clickhouse-server:24.3.12.75-alpine"
+    user: "101"
+    environment:
+      - CLICKHOUSE_USER=$var.username
+      - CLICKHOUSE_PASSWORD=$var.password
+    deploy:
+      replicas: 3
+    group_add:
+      - "101"
+    volumes:
+      - ./fs/volumes/clickhouse/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./fs/volumes/clickhouse/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+      - source: ./data
+        target: /var/lib/clickhouse
+        type: bind
+        x-omnistrate-storage:
+          aws:
+            instanceStorageType: AWS::EBS_GP3
+            instanceStorageSizeGiAPIParam: instanceStorageSizeGi
+            instanceStorageIOPSAPIParam: instanceStorageIOPS
+            instanceStorageThroughputAPIParam: instanceStorageThroughput
+          gcp:
+            instanceStorageType: GCP::PD_BALANCED
+            instanceStorageSizeGiAPIParam: instanceStorageSizeGi
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - clickhouse-keeper
+    x-omnistrate-api-params:
+      - key: instanceStorageIOPS
+        description: Instance Storage IOPS; Applicable to AWS only
+        name: Instance Storage IOPS
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "3000"
+      - key: instanceStorageThroughput
+        description: Instance Storage Throughput (in MB /s); Applicable to AWS only
+        name: Instance Storage Throughput
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "125"
+      - key: instanceStorageSizeGi
+        description: Instance Storage Size (in GiB)
+        name: Instance Storage Size
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "30"
+      - key: instanceType
+        description: Instance Type
+        name: Instance Type
+        type: String
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "t3.xlarge"
+      - key: username
+        description: Clickhouse Username
+        name: Clickhouse Username
+        type: String
+        modifiable: false
+        required: false
+        export: true
+        defaultValue: "default"
+      - key: password
+        description: Clickhouse Password
+        name: Clickhouse Password
+        type: Password
+        modifiable: false
+        required: true
+        export: true
+    x-omnistrate-compute:
+      instanceTypes:
+        - cloudProvider: aws
+          apiParam: instanceType
+        - cloudProvider: gcp
+          apiParam: instanceType
+    x-omnistrate-capabilities:
+      enableMultiZone: true
+      backupConfiguration:
+        backupRetentionInDays: 30
+        backupPeriodInHours: 24
+  clickhouse-keeper:
+    x-omnistrate-mode-internal: true
+    labels:
+      - "name=Clickhouse Keeper"
+    image: "clickhouse/clickhouse-keeper:24.3.12.75-alpine"
+    user: "101"
+    group_add:
+      - "101"
+    deploy:
+      replicas: 3
+    volumes:
+      - ./fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+      - source: ./data
+        target: /var/lib/clickhouse-keeper
+        type: bind
+        x-omnistrate-storage:
+          aws:
+            instanceStorageType: AWS::EBS_GP3
+            instanceStorageSizeGiAPIParam: instanceStorageSizeGi
+            instanceStorageIOPSAPIParam: instanceStorageIOPS
+            instanceStorageThroughputAPIParam: instanceStorageThroughput
+          gcp:
+            instanceStorageType: GCP::PD_BALANCED
+            instanceStorageSizeGiAPIParam: instanceStorageSizeGi
+    x-omnistrate-compute:
+      instanceTypes:
+        - cloudProvider: aws
+          name: t3.large
+        - cloudProvider: gcp
+          name: n2-standard-2
+    x-omnistrate-capabilities:
+      enableMultiZone: true
+    x-omnistrate-api-params:
+      - key: instanceStorageIOPS
+        description: Instance Storage IOPS; Applicable to AWS only
+        name: Instance Storage IOPS
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "3000"
+      - key: instanceStorageThroughput
+        description: Instance Storage Throughput (in MB /s); Applicable to AWS only
+        name: Instance Storage Throughput
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "125"
+      - key: instanceStorageSizeGi
+        description: Instance Storage Size (in GiB)
+        name: Instance Storage Size
+        type: Float64
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "30"
+      - key: instanceType
+        description: Instance Type
+        name: Instance Type
+        type: String
+        modifiable: true
+        required: false
+        export: true
+        defaultValue: "t3.large"
