@@ -3,6 +3,7 @@
 A ClickHouse cluster with 
 - 3 dedicated ClickHouse Keepers
 - 1 shard with replication across 3 Clickhouse VMs
+- Backup and restore enabled w/ 30 day retention and 1 day backup interval
 
 Use this for:
 - BYOA
